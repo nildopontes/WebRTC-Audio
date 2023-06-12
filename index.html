@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width, user-scalable=yes, initial-scale=1, maximum-scale=1">
+      <script src="https://cdn.scaledrone.com/scaledrone.min.js"></script>
+      <script src="script.js"></script>
+      <style>
+         body{
+            background:#1C1C1C;
+            padding:0;
+            height:100vh;
+            width:100vw;
+            margin:0;
+            color:white;
+         }
+         audio{
+            background:gray;
+            visibility:hidden;
+            border-radius:14px;
+            border:5px solid #1C1C1C;
+            margin:0;
+            box-sizing:border-box;
+            float:left;
+         }
+         #log{
+            display:none;
+            width:100vw;
+            height:100vh;
+            position:fixed;
+            top:0;
+            left:0;
+            opacity:0.5;
+         }
+      </style>
+   </head>
+   <body>
+      <audio id="remoteAudio1" controls autoplay></audio>
+      <audio id="remoteAudio2" controls autoplay></audio>
+      <audio id="remoteAudio3" controls autoplay></audio>
+      <textarea id="log"></textarea>
+   </body>
+</html>
+
