@@ -113,9 +113,9 @@ drone.on('open', error => {
       setAudioLayout();
    });
    // Exclui da lista o usuário que acabou de sair da sala
-   room.on('member_leave', ({id}) => {
+   room.on('member_leave', member => {
       onLog('Saiu um membro com id = ' + id);
-      const index = clients.findIndex(member => member.id === id);
+      const index = clients.findIndex(client => client.id === member.id);
       clients[index].id = '';
       setAudioLayout();
    });
