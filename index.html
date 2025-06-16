@@ -2,7 +2,7 @@
 <html>
    <head>
       <meta charset="UTF-8"/>
-      <meta name="viewport" content="width=device-width, user-scalable=yes, initial-scale=1, maximum-scale=1">
+      <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
       <script src="https://cdn.scaledrone.com/scaledrone.min.js"></script>
       <script src="script.js"></script>
       <style>
@@ -15,12 +15,6 @@
             color:white;
          }
          audio{
-            background:gray;
-            visibility:hidden;
-            border-radius:14px;
-            border:5px solid #1C1C1C;
-            margin:0;
-            box-sizing:border-box;
             float:left;
          }
          #log{
@@ -32,13 +26,25 @@
             left:0;
             opacity:0.5;
          }
+         input{
+            width:100px;
+            height:100px;
+            position:fixed;
+            bottom:30px;
+            left:calc(50vw - 50px);
+            background:green;
+            color:white;
+            border-radius:50%;
+            border:0;
+            line-height:100px;
+            font-size:80px;
+            outline:none;
+         }
       </style>
    </head>
    <body>
-      <audio id="remoteAudio1" controls autoplay></audio>
-      <audio id="remoteAudio2" controls autoplay></audio>
-      <audio id="remoteAudio3" controls autoplay></audio>
       <textarea id="log"></textarea>
+      <input id="call" type="button" value="✆" onclick="initStream()" disabled>
    </body>
 </html>
 

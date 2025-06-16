@@ -8,62 +8,73 @@ const configuration = {
       urls: 'stun:stun.l.google.com:19302'
    }]
 };
-const offerOptions = {
-  offerToReceiveAudio: 1,
-  offerToReceiveVideo: 0,
-  voiceActivityDetection: false
-};
 var showLog = false;
-var remoteAudio;
 var room;
-var pc = [new RTCPeerConnection(configuration), new RTCPeerConnection(configuration), new RTCPeerConnection(configuration)];
-document.addEventListener("DOMContentLoaded", function() {
-   remoteAudio = [remoteAudio1, remoteAudio2, remoteAudio3];
+var pc = {};
+var stream;
+document.addEventListener('DOMContentLoaded', () => {
    if(location.search == '?log'){
       showLog = true;
       log.style.display = 'initial';
    }
    onLog('Documento carregado');
 });
-var clients = [{id: ''}, {id: ''}, {id: ''}];
 
-navigator.mediaDevices.getUserMedia({audio: true, video: false}).then(stream => {
-   // Anexa o fluxo de audio local à conexão
-   pc.forEach((element, index) => {
-      onLog('Fluxo local adicionado ao pc[' + index + ']');
-      element.addTrack(stream.getTracks()[0], stream);
-   });
+navigator.mediaDevices.getUserMedia({audio: true, video: false}).then(s => {
+   stream = s;
+   document.getElementById('call').removeAttribute('disabled');
 });
-
-pc.forEach((element, index) => {
-   // Envia um novo 'candidate' local descoberto para os membros na sala
-   element.onicecandidate = event => {
-      if(event.candidate){
-         onLog('Candidate enviado pelo pc[' + index + ']');
-         sendMessage({'candidate': event.candidate}, clients[index].id);
-      }
-   };
-   // Anexa o fluxo de audio recebido à sua respectiva tag audio
-   element.ontrack = event => {
-      const stream = event.streams[0];
-      onLog('Audio remoto recebido foi anexado à conexão em pc[' + index + ']');
-      remoteAudio[index].srcObject = stream;
-   };
-});
-// Ajusta o estilo dos players de audios conforme a quantidade de clientes online
-function setAudioLayout(){
-   var qtdClients = 0;
-   clients.forEach((client, index) => {
-      if(client.id == ''){
-         remoteAudio[index].style.visibility = 'hidden';
-      }else{
-         qtdClients++;
-         remoteAudio[index].style.visibility = 'initial';
-      }
+function initStream(){
+   Object.keys(pc).forEach(key => {
+      onLog('Stream enviado para ' + key);
+      pc[key].addTrack(stream.getTracks()[0]);
+      pc[key].createOffer().then(offer => {
+         pc[key].setLocalDescription(offer).then(() => {
+            onLog('Oferta para ' + key);
+            sendMessage({'sdp': pc[key].localDescription}, key);
+         });
+      }).catch(err => onLog(err));
    });
-   onLog(qtdClients + ' clientes online');
+   let bt = document.getElementById('call');
+   bt.style.background = 'red';
+   bt.setAttribute('onclick', 'stopStream()');
 }
-// Escreve no log se o mesmo estiver visivel
+
+function stopStream(){
+   Object.keys(pc).forEach(key => {
+      pc[key].close();
+      onLog('Encerra chamada com ' + key);
+      let element = document.getElementById(key);
+      if(element) element.remove();
+   });
+   let bt = document.getElementById('call');
+   bt.style.background = 'green';
+   bt.setAttribute('onclick', 'initStream()');
+}
+
+function addMember(member){
+   onLog(member + ' adicionado');
+   let pcn = new RTCPeerConnection(configuration);
+   pcn.onicecandidate = event => {
+      if(event.candidate){
+         onLog('icecandidate para ' + member);
+         sendMessage({'candidate': event.candidate}, member);
+      }
+   };
+   pcn.ontrack = event => {
+      onLog('Stream de ' + member);
+      const stream = new MediaStream([event.track]);
+      onLog(event);
+      let audio = document.createElement('audio');
+      audio.setAttribute('id', member);
+      audio.setAttribute('controls', '');
+      audio.setAttribute('autoplay', '');
+      audio.srcObject = stream;
+      document.body.appendChild(audio);
+   };
+   pc[member] = pcn;
+}
+
 function onLog(msg){
    if(!showLog) return;
    log.value += msg + '\n';
@@ -82,42 +93,27 @@ drone.on('open', error => {
    });
    // Evento que dispara somente 1 vez ao entrar na sala. Retorna os membros online
    room.on('members', members => {
-      onLog('Entrei na sala com id = ' + drone.clientId + '. Usuarios online: ' + (members.length-1));
+      onLog('Entrei na sala com id = ' + drone.clientId);
       if(members.length > 1){
-         setAudioLayout();
          members.forEach(member => {
             if(member.id != drone.clientId){
-               for(var i = 0; i < 3; i++){
-                  if(clients[i].id === ''){
-                     clients[i].id = member.id;
-                     onLog('Cliente com id = ' + member.id + ' presente na sala, foi adicionado à lista local');
-                     break;
-                  }
-               }
+               onLog(member.id + ' membro na sala');
+               addMember(member.id);
             }
          });
       }
-      setAudioLayout();
-      startWebRTC(members.length);
+      startWebRTC();
    });
    // Adiciona à lista um usuário que acabou de entrar na sala
    room.on('member_join', member => {
-      onLog('Um membro novo tentou entrar com id = ' + member.id);
-      for(var i = 0; i < 3; i++){
-         if(clients[i].id === ''){
-            clients[i].id = member.id;
-            onLog('Havia espaço. Ele conseguiu ficar.');
-            break;
-         }
-      }
-      setAudioLayout();
+      addMember(member.id);
    });
    // Exclui da lista o usuário que acabou de sair da sala
    room.on('member_leave', member => {
-      onLog('Saiu um membro com id = ' + id);
-      const index = clients.findIndex(client => client.id === member.id);
-      clients[index].id = '';
-      setAudioLayout();
+      let element = document.getElementById(member.id);
+      if(element) element.remove();
+      delete pc[member.id];
+      onLog(member.id + ' saiu');
    });
 });
 
@@ -131,38 +127,21 @@ function sendMessage(message, destinyId){
       message
    });
 }
-function startWebRTC(qtdMembers){
-   onLog('startWebRTC(' + qtdMembers + ')');
-   // Se é o segundo usuário por diante oferece a conexão aos usuários online
-   if(qtdMembers > 1){
-      pc.forEach((element, index) => {
-         element.createOffer(offerOptions)
-                .then(offer => element.setLocalDescription(offer))
-                .then(() => {
-                   sendMessage({'sdp': element.localDescription}, clients[index].id);
-                   onLog('SDP enviado pelo pc[' + index + ']');
-                }).catch(err => onLog(err));
-      });
-   }
-   // Evento disparado sempre que chega uma nova mensagem do servidor de sinalização
-   room.on('data', (message, client) => {
+function startWebRTC(){
+   onLog('WebRTC iniciado');
+   room.on('data', (message, member) => {
       if(message.destiny != drone.clientId) return;
-      const index = clients.findIndex(member => member.id === client.id);
-      if(message.sdp){ // Mensagem é uma descrição da sessão remota
-         onLog('SDP recebido de ' + client.id);
-         pc[index].setRemoteDescription(new RTCSessionDescription(message.sdp), () => {
-            // Respondemos a mensagem com nossos dados
-            if(pc[index].remoteDescription.type === 'offer'){
-               pc[index].createAnswer().then((offer) => pc[index].setLocalDescription(offer)).then(() => {
-                  sendMessage({'sdp': pc[index].localDescription}, clients[index].id); onLog('SDP enviado por pc[' + index + ']');}).catch((err) => {
-                  onLog(err);
-               });
+      if(message.sdp){
+         onLog('SDP recebido de ' + member.id);
+         pc[member.id].setRemoteDescription(message.sdp, () => {
+            if(pc[member.id].remoteDescription.type === 'offer'){
+               onLog('SDP type is offer');
+               pc[member.id].createAnswer().then(answer => pc[member.id].setLocalDescription(answer)).then(() => sendMessage({'sdp': pc[member.id].localDescription}, member.id)).catch(err => onLog(err));
             }
-         }, onLog);
-      }else if(message.candidate){ // Mensagem é um candidate ICE
-         onLog('Candidate recebido de ' + client.id);
-         // Adiciona à conexão local o novo ICE candidate recebido da conexão remota
-         pc[index].addIceCandidate(message.candidate).catch(err => onLog(err));
+         });
+      }else if(message.candidate){
+         onLog('Candidate recebido de ' + member.id);
+         pc[member.id].addIceCandidate(message.candidate).catch(err => onLog(err));
       }
    });
 }
